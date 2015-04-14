@@ -1,0 +1,72 @@
+#!/usr/bin/python
+"""
+Yet Another grep.
+But user friendly.
+
+sudo ln -s ./pygrep /usr/local/bin
+"""
+import re
+import click
+import sys
+
+
+@click.group()
+def main():
+    pass
+
+
+@main.command()
+@click.argument('match_pattern')
+@click.argument('replacement_pattern')
+@click.argument('input', type=click.File('r'), default='-')
+def replace_match(match_pattern, replacement_pattern, input):
+    """
+    Replaces the first matching part of each line with the replacement pattern.
+    """
+    r = re.compile(match_pattern)
+    for line in input:
+        print r.sub(replacement_pattern, line)
+
+
+@main.command()
+@click.argument('match_pattern')
+@click.argument('input', type=click.File('r'), default='-')
+@click.option('-g', '--group', default=-1)
+def print_match(match_pattern, group, input):
+    """
+    Prints the first part of each line matching a pattern.
+    group option:
+        - < 0: prints the whole match if no capturing group specified, otherwise
+               prints only the first capturing group.
+        - = 0: prints the whole match
+        - > 0: prints only the specified capturing group
+    """
+
+    r = re.compile(match_pattern)
+    for line in input:
+        match = r.search(line)
+        if match:
+            if group >= 0:
+                print match.group(group)
+            elif match.groups():
+                print match.group(1)
+            else:
+                print match.group(0)
+
+
+@main.command()
+@click.argument('match_pattern')
+@click.argument('input', type=click.File('r'), default='-')
+def print_line(match_pattern, input):
+    """
+    Prints the lines matching the given pattern.
+    """
+    r = re.compile(match_pattern)
+    for line in input:
+        match = r.search(line)
+        if match:
+            print line
+
+
+if __name__ == '__main__':
+    main()
