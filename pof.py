@@ -1,14 +1,15 @@
 """
 http://en.wikipedia.org/wiki/Proof-of-work_system
 
+Generates a string which, when hashed, starts with at least n zero bits
 For example:
 
-$ python pof.py 4 -s 'ciao-' -S 30 2>/dev/null
-zpfljbbqgamhdzhjcgekmaxyaxltys
-000089f0f44053222c9145f64cbfb5174d097a57
+$ python pof.py 8 -s 'ciao-' -S 30 -a sha1 2>/dev/null
+eMloHwJPCCtfW9Co8zDZWsdcgUrrMh
+007673eefcadc7aa71887a284ec52b1a53020d44
 
-In [44]: hashlib.sha1('ciao-zpfljbbqgamhdzhjcgekmaxyaxltys').hexdigest()
-Out[44]: '000089f0f44053222c9145f64cbfb5174d097a57'
+In [44]: hashlib.sha1('ciao-eMloHwJPCCtfW9Co8zDZWsdcgUrrMh').hexdigest()
+Out[44]: '007673eefcadc7aa71887a284ec52b1a53020d44'
 """
 
 import hashlib
@@ -20,26 +21,31 @@ import time
 import Queue
 
 
-def hash_generator(s, n):
+def hash_generator(base, length, algorithm):
+    hash_function = getattr(hashlib, algorithm)
+    alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
     def wrapped():
-        a = 'abcdefghijklmnopqrstuvwxyz0123456789'
         while True:
-            content = reduce(lambda x, y: x + random.choice(a), range(n), '')
-            yield content, hashlib.sha1(s + content).hexdigest()
+            content = reduce(lambda x, y: x + random.choice(alphabet), range(length), '')
+            yield content, hash_function(base + content).hexdigest()
     return wrapped
 
 
-def pof(i, generator, result):
-    best, start = 0, time.time()
+def pof(i, generator, result, stop):
+    best, start = 'f', time.time()
     try:
         for n, (append, hash) in enumerate(generator()):
-            zeroes = 0
-            while zeroes < len(hash) and hash[zeroes] == '0':
-                zeroes += 1
-        
-            if zeroes > best:
-                result.put((append, hash, zeroes))
-                best = zeroes
+            if hash < best:
+                result.put((append, hash))
+                best = hash
+
+            if n % 1000 == 0:
+                try:
+                    _ = stop.get_nowait()
+                except Queue.Empty:
+                    pass
+                else:
+                    break
     except KeyboardInterrupt:
         pass
 
@@ -48,28 +54,45 @@ def pof(i, generator, result):
                           i, n, duration, n / duration)
 
 
+def num_zeroes_prefix(h):
+    zeroes = [4, 3] + [2]*2 + [1]*4 + [0]*8
+
+    z = 0
+    while z < len(h) and h[z] == '0':
+        z += 1
+    return 4 * z + (zeroes[int(h[z], 16)] if z < len(h) else 0)
+
+
 @click.command()
 @click.argument('num-zeroes', type=int)
 @click.option('-p', '--processes', default=mp.cpu_count())
 @click.option('-s', '--base-string', default='')
 @click.option('-S', '--string-size', default=50)
-def main(num_zeroes, processes, string_size, base_string):
-    result = mp.Manager().Queue()
-    generator = hash_generator(base_string, string_size)
-    processes = [mp.Process(target=pof, args=(i, generator, result))
+@click.option('-a', '--algorithm', default='sha1', type=click.Choice(hashlib.algorithms))
+def main(num_zeroes, processes, string_size, base_string, algorithm):
+    manager = mp.Manager()
+    result, stop = manager.Queue(), manager.Queue()
+    generator = hash_generator(base_string, string_size, algorithm)
+    processes = [mp.Process(target=pof, args=(i, generator, result, stop))
                  for i in range(processes)]
     [p.start() for p in processes]
 
-    append, hash, best = '', '', 0
+    append, hash, best = '', 'f', 0
     try:
         while best < num_zeroes:
-            a, h, z = result.get()
-            if z > best:
+            a, h = result.get()
+
+            if h < hash:
+                z = num_zeroes_prefix(h)
                 num = int(24. * z / num_zeroes)
                 print >> sys.stderr, h, a, '|' + '-' * num + '>' +  ' ' * (25 - num) + '|'
+
                 append, hash, best = a, h, z
     except KeyboardInterrupt:
         pass
+    else:
+        [stop.put(1) for _ in processes]
+        [p.join() for p in processes]
 
     print append
     print hash
