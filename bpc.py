@@ -2,7 +2,7 @@
 Brainfuck to python compiler. Example:
 
 
-$ cat mul.bf 
+$ cat mul.bf
 read a and b
 ,>,<
 
@@ -23,9 +23,9 @@ compute c = a*b using d as temp (pointer starts and ends and a)
 print c
 >>.
 
-$ python bpc.py --comments --memory 5 --optimizations 2 --output a.py mul.bf 
+$ python bpc.py --comments --memory 5 --optimizations 2 --output a.py mul.bf
 
-$ cat a.py 
+$ cat a.py
 # -*- coding: UTF-8 -*-
 m = [ 0 ] * 5
 p = 0
@@ -58,22 +58,23 @@ while m[p]:
 # print c
 print m[p + 2]
 
-$ python a.py 
+$ python a.py
 Insert a number: 5
 Insert a number: 3
 15
 
-$ 
+$
 """
 import click
 import re
+
 
 class CodeBuilder(object):
     """
     Builds the code by incrementally adding statements to it, automatically
     managing code indentation.
     """
-    def  __init__(self, indent_size=4, indent_char=' '):
+    def __init__(self, indent_size=4, indent_char=' '):
         self.code = list()
         self.indent = 0
         self.indent_size = indent_size
@@ -110,7 +111,7 @@ class Tokenizer(object):
     Splits the code into tokens (either instructions or comments). Generates an
     event for each token and when the process has finished.
     """
-    instruction_set = set(['+', '-', '<', '>', '.', ',', ']', '[' ])
+    instruction_set = set(['+', '-', '<', '>', '.', ',', ']', '['])
 
     def __init__(self):
         self.handlers = {
@@ -138,7 +139,7 @@ class Tokenizer(object):
                 while i < code_length and not code[i] in self.instruction_set:
                     i += 1
                 self._invoke_handlers('comment', code[start:i], start, i)
-                
+
         self._invoke_handlers('finish')
 
 
@@ -225,7 +226,7 @@ class Compiler1(Compiler0):
             self.builder.append('p = (p - %d) %% %d' % (self.times, self.memory_size))
         elif self.operation == '>':
             self.builder.append('p = (p + %d) %% %d' % (self.times, self.memory_size))
-         
+
     def on_finish(self, *args, **kwargs):
         self._flush()
         super(Compiler1, self).on_finish(*args, **kwargs)
@@ -285,7 +286,7 @@ class Compiler2(Compiler0):
         self.times, self.operation = 1, instruction
 
         if instruction == ',':
-            self.builder.append('m[%s] = int(raw_input("Insert a number: ") or 0)' % 
+            self.builder.append('m[%s] = int(raw_input("Insert a number: ") or 0)' %
                                 self._get_relative_pointer_string())
         elif instruction == '.':
             self.builder.append('print m[%s]' % self._get_relative_pointer_string())
@@ -309,8 +310,8 @@ def compile(code, memory, comments, dump, indent, tab_indent, optimizations):
     builder = CodeBuilder(indent_size=indent, indent_char='\t' if tab_indent else ' ')
     tokenizer = Tokenizer()
 
-    compiler_cls = (Compiler0 if optimizations == 0 else 
-        Compiler1 if optimizations == 1 else Compiler2)
+    compiler_cls = (Compiler0 if optimizations == 0 else
+                    Compiler1 if optimizations == 1 else Compiler2)
     compiler = compiler_cls(tokenizer, builder, memory, comments, dump)
 
     tokenizer.tokenize(code)

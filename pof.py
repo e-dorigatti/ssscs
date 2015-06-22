@@ -24,6 +24,7 @@ import Queue
 def hash_generator(base, length, algorithm):
     hash_function = getattr(hashlib, algorithm)
     alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+
     def wrapped():
         while True:
             content = reduce(lambda x, y: x + random.choice(alphabet), range(length), '')
@@ -85,7 +86,7 @@ def main(num_zeroes, processes, string_size, base_string, algorithm):
             if h < hash:
                 z = num_zeroes_prefix(h)
                 num = int(24. * z / num_zeroes)
-                print >> sys.stderr, h, a, '|' + '-' * num + '>' +  ' ' * (25 - num) + '|'
+                print >> sys.stderr, h, a, '|' + '-' * num + '>' + ' ' * (25 - num) + '|'
 
                 append, hash, best = a, h, z
     except KeyboardInterrupt:
