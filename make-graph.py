@@ -30,11 +30,12 @@ def worker_process(in_queue, out_queue, num_nodes):
     # ignore keyboard interrupts, the master will take care of them
     signal.signal(signal.SIGINT, signal.SIG_IGN)
 
+    all_nodes = range(num_nodes)  # generate this now and forever
     pack = in_queue.get()
     while pack is not None:
         node, num_edges = pack
-        edges = random.sample(range(num_nodes), num_edges)
-        if edges:
+        edges = random.sample(all_nodes, num_edges)
+        if edges:  # some nodes won't have outbound edges
             out_queue.put('\n'.join('%d %d' % (node, v) for v in edges))
         pack = in_queue.get()
 
@@ -68,16 +69,16 @@ def writer_process(in_queue, fp):
               help='Standard deviation of outbound edge count per node')
 @click.option('--processes', '-p', default=mp.cpu_count()-1,
               help='How many worker processes to use to generate the graph')
-@click.option('--queue-size', '-q', default=500, help='Size of the nodes queue.')
+@click.option('--queue-size', '-q', default=1000, help='Size of the nodes queue.')
 def main(out_file, nodes, degree_avg, degree_stdev, processes, queue_size):
     """
     Generates a random directed graph. The number of outbound edges per node
     is distributed normally.
     """
-    print 'Generating edge counts...'
+    print >> sys.stderr, 'Generating edge counts...'
     edges = [max(0, min(nodes, int(random.normalvariate(degree_avg, degree_stdev))))
              for _ in range(nodes)]
-    print 'Graph will have %d edges' % sum(edges)
+    print >> sys.stderr, 'Graph will have %d edges' % sum(edges)
     out_file.write('%d\n%d\n' % (nodes, sum(edges)))
     out_file.flush()  # do not buffer, actually write this to file
 
